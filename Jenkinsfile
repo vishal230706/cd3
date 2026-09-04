@@ -1,70 +1,99 @@
 pipeline {
     agent any
 
-    tools {
-        jdk 'JDK17'
-    }
-
     stages {
 
-        stage('Checkout') {
+        stage('Git Checkout') {
             steps {
-                echo 'Checking out Banking System source code...'
+                echo 'Checking out code from GitHub...'
                 checkout scm
+            }
+        }
+
+        stage('Check Java') {
+            steps {
+                sh '''
+                    echo "Java version:"
+                    java -version
+
+                    echo "Javac version:"
+                    javac -version
+                '''
             }
         }
 
         stage('Build') {
             steps {
-                echo 'Compiling Java source files...'
+                dir('BankingSystem-master') {
+                    sh '''
+                        echo "Compiling Java source files..."
 
-                sh '''
-                    rm -rf build
-                    mkdir -p build
+                        rm -rf build
+                        mkdir -p build
 
-                    find src -name "*.java" > sources.txt
+                        find src -name "*.java" > sources.txt
 
-                    javac -d build @sources.txt
-                '''
+                        javac -d build @sources.txt
+                    '''
+                }
             }
         }
 
         stage('Test') {
             steps {
-                echo 'Running basic Java validation...'
+                dir('BankingSystem-master') {
+                    sh '''
+                        echo "Checking compiled Java classes..."
 
-                sh '''
-                    java -version
-                    find build -name "*.class" | head
-                '''
+                        find build -name "*.class"
+
+                        if [ -z "$(find build -name '*.class')" ]; then
+                            echo "No class files found!"
+                            exit 1
+                        fi
+
+                        echo "Compilation successful!"
+                    '''
+                }
             }
         }
 
         stage('Package') {
             steps {
-                echo 'Creating application JAR...'
+                dir('BankingSystem-master') {
+                    sh '''
+                        echo "Creating JAR file..."
 
-                sh '''
-                    jar cf BankingSystem.jar -C build .
-                '''
+                        jar cf BankingSystem.jar -C build .
+
+                        ls -lh BankingSystem.jar
+                    '''
+                }
             }
         }
 
         stage('Archive') {
             steps {
-                archiveArtifacts artifacts: 'BankingSystem.jar',
-                                 fingerprint: true
+                dir('BankingSystem-master') {
+                    archiveArtifacts artifacts: 'BankingSystem.jar',
+                                     fingerprint: true
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'Banking System build completed successfully!'
+            echo '======================================'
+            echo ' Banking System build SUCCESSFUL!'
+            echo '======================================'
         }
 
         failure {
-            echo 'Banking System build failed.'
+            echo '======================================'
+            echo ' Banking System build FAILED!'
+            echo ' Check the Console Output.'
+            echo '======================================'
         }
 
         always {
