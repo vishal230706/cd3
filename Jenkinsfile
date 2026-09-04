@@ -1,103 +1,47 @@
 pipeline {
     agent any
 
+    tools {
+        ant 'Ant'
+        jdk 'java21'
+    }
+
     stages {
 
-        stage('Git Checkout') {
+        stage('Clean') {
             steps {
-                echo 'Checking out code from GitHub...'
-                checkout scm
-            }
-        }
-
-        stage('Check Java') {
-            steps {
-                sh '''
-                    echo "Java version:"
-                    java -version
-
-                    echo "Javac version:"
-                    javac -version
-                '''
+                sh 'ant -f banking-devops-pipeline-master/demo1/build.xml clean'
             }
         }
 
         stage('Build') {
             steps {
-                dir('BankingSystem-master') {
-                    sh '''
-                        echo "Compiling Java source files..."
-
-                        rm -rf build
-                        mkdir -p build
-
-                        find src -name "*.java" > sources.txt
-
-                        javac -d build @sources.txt
-                    '''
-                }
+                sh 'ant -f banking-devops-pipeline-master/demo1/build.xml build'
             }
         }
 
         stage('Test') {
             steps {
-                dir('BankingSystem-master') {
-                    sh '''
-                        echo "Checking compiled Java classes..."
-
-                        find build -name "*.class"
-
-                        if [ -z "$(find build -name '*.class')" ]; then
-                            echo "No class files found!"
-                            exit 1
-                        fi
-
-                        echo "Compilation successful!"
-                    '''
-                }
+                sh 'ant -f banking-devops-pipeline-master/demo1/build.xml Debt_CalculationTest'
             }
         }
 
-        stage('Package') {
+        stage('Junit reports') {
             steps {
-                dir('BankingSystem-master') {
-                    sh '''
-                        echo "Creating JAR file..."
-
-                        jar cf BankingSystem.jar -C build .
-
-                        ls -lh BankingSystem.jar
-                    '''
-                }
+                sh 'ant -f banking-devops-pipeline-master/demo1/build.xml junitreport'
             }
         }
 
-        stage('Archive') {
+        stage('Mutation Testing') {
             steps {
-                dir('BankingSystem-master') {
-                    archiveArtifacts artifacts: 'BankingSystem.jar',
-                                     fingerprint: true
-                }
+                sh 'ant -f banking-devops-pipeline-master/demo1/build.xml pit'
             }
         }
-    }
 
-    post {
-        success {
-            echo '======================================'
-            echo ' Banking System build SUCCESSFUL!'
-            echo '======================================'
-        }
-
-        failure {
-            echo '======================================'
-            echo ' Banking System build FAILED!'
-            echo ' Check the Console Output.'
-            echo '======================================'
-        }
-
-        always {
-            echo 'Jenkins pipeline execution completed.'
+        stage('Find Bugs') {
+            steps {
+                sh 'ant -f banking-devops-pipeline-master/demo1/build.xml spotbugs'
+            }
         }
     }
 }
